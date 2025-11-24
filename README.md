@@ -2,6 +2,8 @@
 
 A microservices-based e-commerce demo application built with Java and Spring Boot. Each service runs in its own JVM, demonstrating a distributed system architecture.
 
+**✨ NOW WITH WEB UI!** - Interactive browser-based interface included!
+
 **GitHub Repository:** https://github.com/zzmarczz/e-commerceDemo.git
 
 ## Architecture
@@ -69,15 +71,20 @@ mvn clean package -DskipTests
 ./start-all-jar.sh
 ```
 
-### Option 3: With Load Generator (for APM monitoring)
+### Option 3: With UI + Load Generator (for APM monitoring)
 
-Perfect for showcasing APM tools! Starts all services + continuous load generation:
+Perfect for showcasing APM tools! Starts all services + UI + continuous load generation:
 
 ```bash
 ./start-with-load.sh
 ```
 
+Then open:
+- **Web UI:** http://localhost:3000
+- **Load Stats:** http://localhost:9090/stats
+
 This includes:
+- Frontend Web UI (Port 3000)
 - All 4 microservices
 - Load Generator (Port 9090)
 - Continuous realistic traffic

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# E-Commerce Demo with Load Generator
-# Starts all services + continuous load generator
+# E-Commerce Demo with Web UI (without load generator)
+# Perfect for interactive demos and manual testing
 
 echo "=============================================="
-echo "E-Commerce Demo with Load Generator"
+echo "E-Commerce Demo with Web UI"
 echo "=============================================="
 echo ""
 
@@ -15,8 +15,8 @@ then
     exit 1
 fi
 
-# Build all services including load generator
-echo "Building all services (including load generator)..."
+# Build all services
+echo "Building all services..."
 mvn clean install -DskipTests
 
 if [ $? -ne 0 ]; then
@@ -69,15 +69,6 @@ echo "✓ API Gateway started (PID: $GATEWAY_PID)"
 cd ..
 sleep 5
 
-# Start Load Generator
-echo "Starting Load Generator on port 9090..."
-cd load-generator
-nohup mvn spring-boot:run > ../logs/load-generator.log 2>&1 &
-LOADGEN_PID=$!
-echo "✓ Load Generator started (PID: $LOADGEN_PID)"
-cd ..
-sleep 3
-
 # Start Frontend
 echo "Starting Frontend UI on port 3000..."
 cd frontend
@@ -85,14 +76,13 @@ nohup mvn spring-boot:run > ../logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
 echo "✓ Frontend UI started (PID: $FRONTEND_PID)"
 cd ..
-sleep 3
+sleep 5
 
 # Save PIDs to file for stop script
 echo $PRODUCT_PID > .pids
 echo $CART_PID >> .pids
 echo $ORDER_PID >> .pids
 echo $GATEWAY_PID >> .pids
-echo $LOADGEN_PID >> .pids
 echo $FRONTEND_PID >> .pids
 
 echo ""
@@ -100,24 +90,20 @@ echo "=============================================="
 echo "All services started successfully!"
 echo "=============================================="
 echo ""
+echo "🌐 Open your browser and visit:"
+echo ""
+echo "   http://localhost:3000"
+echo ""
+echo "=============================================="
+echo ""
 echo "Service URLs:"
-echo "  - 🌐 Web UI:         http://localhost:3000  ← OPEN THIS IN BROWSER"
+echo "  - 🌐 Web UI:         http://localhost:3000  ← OPEN THIS"
 echo "  - API Gateway:      http://localhost:8080"
 echo "  - Product Service:  http://localhost:8081"
 echo "  - Cart Service:     http://localhost:8082"
 echo "  - Order Service:    http://localhost:8083"
-echo "  - Load Generator:   http://localhost:9090"
-echo ""
-echo "Load Generator Control:"
-echo "  - Statistics:       http://localhost:9090/stats"
-echo "  - Control Panel:    http://localhost:9090/control"
-echo "  - Enable Load:      curl -X POST http://localhost:9090/enable"
-echo "  - Disable Load:     curl -X POST http://localhost:9090/disable"
-echo "  - Set Intensity:    curl -X POST 'http://localhost:9090/intensity?level=high'"
 echo ""
 echo "Logs are available in the 'logs' directory"
-echo ""
-echo "⚡ Load generation is ACTIVE - Perfect for APM monitoring!"
 echo ""
 echo "To stop all services: ./stop-all.sh"
 echo "=============================================="

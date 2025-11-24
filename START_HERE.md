@@ -1,6 +1,27 @@
-# 🚀 START HERE - E-Commerce Demo with APM Load Generation
+# 🚀 START HERE - E-Commerce Demo
 
-## For APM Monitoring Demo
+## 🌐 For Interactive Use (Web UI)
+
+### Quick Start with Browser Interface
+
+```bash
+./start-with-ui.sh
+```
+
+**Then open:** http://localhost:3000
+
+You'll get a beautiful web interface where you can:
+- ✨ Browse products
+- 🛒 Add items to cart
+- 💳 Complete checkout
+- 📦 View orders
+- 👤 Switch users
+
+**Perfect for:** Demos, manual testing, presentations
+
+---
+
+## 📊 For APM Monitoring Demo
 
 If you want to showcase an APM tool, follow these steps:
 
@@ -65,7 +86,14 @@ curl -X POST http://localhost:9090/enable
 
 ## For Manual Testing
 
-If you want to manually test without load generation:
+### Option 1: Web UI (Recommended)
+
+```bash
+./start-with-ui.sh
+# Open http://localhost:3000
+```
+
+### Option 2: Command Line
 
 ```bash
 # Start services
