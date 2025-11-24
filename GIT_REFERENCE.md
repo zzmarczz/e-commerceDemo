@@ -4,7 +4,9 @@
 
 **Location:** `/Users/marcoss2/Documents/DemoApp`  
 **Branch:** `main`  
-**Initial Commit:** c0547e1
+**Initial Commit:** c0547e1  
+**Remote:** https://github.com/zzmarczz/e-commerceDemo.git  
+**Tracking:** main → origin/main
 
 ## Repository Status
 
@@ -212,19 +214,37 @@ git tag v1.0.0
 git tag -d v1.0.0
 ```
 
-## Remote Repository Setup (When Ready)
+## Remote Repository Setup
 
-### GitHub
+### GitHub (Already Configured)
+
+**Remote URL:** https://github.com/zzmarczz/e-commerceDemo.git
 
 ```bash
-# Add remote
-git remote add origin https://github.com/yourusername/ecommerce-demo.git
-
-# Push to remote
-git push -u origin main
-
 # View remotes
 git remote -v
+
+# Push changes
+git push
+
+# Pull changes
+git pull
+
+# Fetch from remote
+git fetch origin
+```
+
+### Adding Additional Remotes
+
+```bash
+# Add another remote
+git remote add upstream <another-repo-url>
+
+# Remove a remote
+git remote remove <name>
+
+# Rename a remote
+git remote rename <old-name> <new-name>
 ```
 
 ### GitLab or Bitbucket

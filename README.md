@@ -2,6 +2,8 @@
 
 A microservices-based e-commerce demo application built with Java and Spring Boot. Each service runs in its own JVM, demonstrating a distributed system architecture.
 
+**GitHub Repository:** https://github.com/zzmarczz/e-commerceDemo.git
+
 ## Architecture
 
 This application consists of 4 independent microservices:
