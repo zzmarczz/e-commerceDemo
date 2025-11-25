@@ -25,8 +25,12 @@ public class CartController {
     @PostMapping("/{userId}/items")
     public ResponseEntity<Cart> addToCart(@PathVariable String userId, 
                                          @RequestBody AddToCartRequest request) {
+        // Find or create cart - if new, save it first
         Cart cart = cartRepository.findByUserId(userId)
-                .orElseGet(() -> new Cart(userId));
+                .orElseGet(() -> {
+                    Cart newCart = new Cart(userId);
+                    return cartRepository.save(newCart);
+                });
 
         // Check if item already exists
         boolean itemExists = false;
