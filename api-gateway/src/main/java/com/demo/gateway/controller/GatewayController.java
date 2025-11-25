@@ -2,6 +2,7 @@ package com.demo.gateway.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -57,6 +58,7 @@ public class GatewayController {
         return webClientBuilder.build()
                 .post()
                 .uri(cartServiceUrl + "/api/cart/" + userId + "/items")
+                .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(String.class);
@@ -86,6 +88,7 @@ public class GatewayController {
         return webClientBuilder.build()
                 .post()
                 .uri(orderServiceUrl + "/api/orders/checkout")
+                .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(String.class);
