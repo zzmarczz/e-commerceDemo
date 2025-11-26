@@ -399,13 +399,28 @@ async function loadAllOrders() {
     try {
         // This endpoint is affected by slow mode
         const response = await fetch(`${API_BASE_URL}/orders`);
-        const orders = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Handle both array and wrapped responses
+        let orders = Array.isArray(data) ? data : (data.orders || []);
         
         clearLoadingTimer();
         loading.style.display = 'none';
         
+        if (!Array.isArray(orders)) {
+            console.error('Invalid response format:', data);
+            throw new Error('Invalid response format - expected array');
+        }
+        
         if (orders.length === 0) {
             ordersList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No orders in system</h3><p>No orders have been placed yet.</p></div>';
+            const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(2);
+            showToast(`Loaded 0 orders in ${elapsed}s`, 'success');
             return;
         }
         
