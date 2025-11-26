@@ -332,17 +332,32 @@ function showOrderConfirmation(order) {
 }
 
 // Orders
+let loadingStartTime = null;
+let loadingTimerInterval = null;
+
 async function loadOrders() {
+    // Default to user orders
+    loadMyOrders();
+}
+
+async function loadMyOrders() {
     const loading = document.getElementById('ordersLoading');
     const ordersList = document.getElementById('ordersList');
+    const loadingTimer = document.getElementById('loadingTimer');
     
+    clearLoadingTimer();
     loading.style.display = 'block';
     ordersList.innerHTML = '';
+    loadingTimer.textContent = '';
+    
+    loadingStartTime = Date.now();
+    startLoadingTimer();
     
     try {
         const response = await fetch(`${API_BASE_URL}/orders/user/${currentUserId}`);
         const orders = await response.json();
         
+        clearLoadingTimer();
         loading.style.display = 'none';
         
         if (orders.length === 0) {
@@ -357,11 +372,83 @@ async function loadOrders() {
             const card = createOrderCard(order);
             ordersList.appendChild(card);
         });
+        
+        const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(2);
+        showToast(`Loaded ${orders.length} orders in ${elapsed}s ⚡`, 'success');
     } catch (error) {
+        clearLoadingTimer();
         loading.style.display = 'none';
         showToast('Failed to load orders: ' + error.message, 'error');
         console.error('Error loading orders:', error);
     }
+}
+
+async function loadAllOrders() {
+    const loading = document.getElementById('ordersLoading');
+    const ordersList = document.getElementById('ordersList');
+    const loadingTimer = document.getElementById('loadingTimer');
+    
+    clearLoadingTimer();
+    loading.style.display = 'block';
+    ordersList.innerHTML = '';
+    loadingTimer.textContent = '';
+    
+    loadingStartTime = Date.now();
+    startLoadingTimer();
+    
+    try {
+        // This endpoint is affected by slow mode
+        const response = await fetch(`${API_BASE_URL}/orders`);
+        const orders = await response.json();
+        
+        clearLoadingTimer();
+        loading.style.display = 'none';
+        
+        if (orders.length === 0) {
+            ordersList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No orders in system</h3><p>No orders have been placed yet.</p></div>';
+            return;
+        }
+        
+        // Sort by date (newest first)
+        orders.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
+        
+        orders.forEach(order => {
+            const card = createOrderCard(order);
+            ordersList.appendChild(card);
+        });
+        
+        const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(2);
+        const emoji = elapsed > 2 ? '🐌' : '⚡';
+        showToast(`Loaded ${orders.length} orders in ${elapsed}s ${emoji}`, elapsed > 2 ? 'error' : 'success');
+    } catch (error) {
+        clearLoadingTimer();
+        loading.style.display = 'none';
+        showToast('Failed to load all orders: ' + error.message, 'error');
+        console.error('Error loading all orders:', error);
+    }
+}
+
+function startLoadingTimer() {
+    loadingTimerInterval = setInterval(() => {
+        if (loadingStartTime) {
+            const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(1);
+            const loadingTimer = document.getElementById('loadingTimer');
+            if (loadingTimer) {
+                loadingTimer.textContent = `⏱️ ${elapsed}s`;
+                if (elapsed > 2) {
+                    loadingTimer.style.color = 'var(--danger)';
+                }
+            }
+        }
+    }, 100);
+}
+
+function clearLoadingTimer() {
+    if (loadingTimerInterval) {
+        clearInterval(loadingTimerInterval);
+        loadingTimerInterval = null;
+    }
+    loadingStartTime = null;
 }
 
 function createOrderCard(order) {
@@ -458,6 +545,8 @@ function closeModal() {
 // Event Listeners
 document.getElementById('checkoutBtn').addEventListener('click', checkout);
 document.getElementById('clearCartBtn').addEventListener('click', clearCart);
+document.getElementById('loadMyOrdersBtn').addEventListener('click', loadMyOrders);
+document.getElementById('loadAllOrdersBtn').addEventListener('click', loadAllOrders);
 document.querySelector('.modal-close').addEventListener('click', closeModal);
 document.getElementById('modal').addEventListener('click', (e) => {
     if (e.target.id === 'modal') {

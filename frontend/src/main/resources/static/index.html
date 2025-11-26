@@ -63,8 +63,17 @@
 
         <!-- Orders Page -->
         <div id="ordersPage" class="page">
-            <h2>My Orders</h2>
-            <div class="loading" id="ordersLoading" style="display: none;">Loading orders...</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="margin: 0;">Orders</h2>
+                <div>
+                    <button id="loadMyOrdersBtn" class="btn btn-secondary">My Orders</button>
+                    <button id="loadAllOrdersBtn" class="btn btn-primary">🐌 All Orders (Slow)</button>
+                </div>
+            </div>
+            <div class="loading" id="ordersLoading" style="display: none;">
+                <div>Loading orders...</div>
+                <div id="loadingTimer" style="margin-top: 0.5rem; color: var(--primary);"></div>
+            </div>
             <div class="orders-list" id="ordersList"></div>
         </div>
     </main>
