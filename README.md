@@ -441,10 +441,39 @@ The application includes a sophisticated load generator for APM monitoring:
 **Documentation:**
 - `APM_MONITORING.md` - Complete APM integration guide
 - `LOAD_GENERATOR_README.md` - Load generator documentation
+- `APM_SLOW_DEMO.md` - Slow response time simulation guide
+
+### Simulating Slow Response Times (NEW!)
+
+Showcase APM's ability to detect performance issues:
+
+```bash
+# Enable slow mode (5s delay on /api/orders)
+./demo-slow-orders.sh enable
+
+# Generate mixed traffic (fast + slow)
+./generate-slow-load.sh
+
+# Watch APM dashboard for:
+#   - Response time spikes
+#   - Slow transaction detection  
+#   - Service bottleneck identification
+
+# Disable slow mode
+./demo-slow-orders.sh disable
+```
+
+**Perfect for demonstrating:**
+- ⏱️ Response time monitoring
+- 🔍 Slow transaction detection
+- 🎯 Bottleneck identification
+- 📊 Performance degradation alerts
+
+See `APM_SLOW_DEMO.md` for complete guide.
 
 ### Use Cases for Load Generation
 
-1. **APM Tool Demonstrations** - Showcase distributed tracing, metrics
+1. **APM Tool Demonstrations** - Showcase distributed tracing, metrics, slow transactions
 2. **Performance Testing** - Test under realistic load
 3. **Capacity Planning** - Understand system limits
 4. **Training** - Learn microservices monitoring
