@@ -419,8 +419,6 @@ async function loadAllOrders() {
         
         if (orders.length === 0) {
             ordersList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No orders in system</h3><p>No orders have been placed yet.</p></div>';
-            const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(2);
-            showToast(`Loaded 0 orders in ${elapsed}s`, 'success');
             return;
         }
         
@@ -431,10 +429,6 @@ async function loadAllOrders() {
             const card = createOrderCard(order);
             ordersList.appendChild(card);
         });
-        
-        const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(2);
-        const emoji = elapsed > 2 ? '🐌' : '⚡';
-        showToast(`Loaded ${orders.length} orders in ${elapsed}s ${emoji}`, elapsed > 2 ? 'error' : 'success');
     } catch (error) {
         clearLoadingTimer();
         loading.style.display = 'none';
