@@ -23,7 +23,7 @@ public class CartController {
     }
 
     @PostMapping("/{userId}/items")
-    public ResponseEntity<Cart> addToCart(@PathVariable String userId, 
+    public ResponseEntity<?> addToCart(@PathVariable String userId, 
                                          @RequestBody AddToCartRequest request) {
         // Find or create cart - if new, save it first
         Cart cart = cartRepository.findByUserId(userId)
@@ -31,6 +31,28 @@ public class CartController {
                     Cart newCart = new Cart(userId);
                     return cartRepository.save(newCart);
                 });
+
+        // BUSINESS RULE: Check keyboard quantity limit (max 5 per customer)
+        if (request.getProductName().equalsIgnoreCase("Keyboard")) {
+            int currentKeyboardCount = 0;
+            
+            // Count existing keyboards in cart
+            for (CartItem item : cart.getItems()) {
+                if (item.getProductName().equalsIgnoreCase("Keyboard")) {
+                    currentKeyboardCount += item.getQuantity();
+                }
+            }
+            
+            // Calculate total after adding new quantity
+            int totalKeyboards = currentKeyboardCount + request.getQuantity();
+            
+            if (totalKeyboards > 5) {
+                // Throw error to showcase APM error detection
+                return ResponseEntity.badRequest()
+                    .body("{\"error\":\"Business Rule Violation\",\"message\":\"Maximum 5 keyboards per customer. You currently have " 
+                        + currentKeyboardCount + " keyboard(s) in cart. Cannot add " + request.getQuantity() + " more.\"}");
+            }
+        }
 
         // Check if item already exists
         boolean itemExists = false;

@@ -157,7 +157,14 @@ async function addToCart(productId, productName, price) {
             updateCartBadge();
             qtyInput.value = 1;
         } else {
-            throw new Error('Failed to add to cart');
+            // Try to parse error message from server
+            try {
+                const errorData = await response.json();
+                const errorMessage = errorData.message || errorData.error || 'Failed to add to cart';
+                throw new Error(errorMessage);
+            } catch (parseError) {
+                throw new Error('Failed to add to cart');
+            }
         }
     } catch (error) {
         showToast('Failed to add to cart: ' + error.message, 'error');

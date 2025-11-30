@@ -503,3 +503,4 @@ curl -X POST 'http://localhost:9090/intensity?level=high'
 
 Happy monitoring! 📊
 
+

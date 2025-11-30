@@ -117,3 +117,4 @@ echo "2. Cart service logs: tail -f logs/cart-service.log"
 echo "3. API gateway logs: tail -f logs/api-gateway.log"
 echo ""
 
+

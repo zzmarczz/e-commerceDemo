@@ -90,3 +90,4 @@ echo "Logs are available in the 'logs' directory"
 echo ""
 echo "To stop all services, run: ./stop-all.sh"
 
+
