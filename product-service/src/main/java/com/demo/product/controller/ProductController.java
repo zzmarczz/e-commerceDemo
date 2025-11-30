@@ -22,6 +22,12 @@ public class ProductController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Product> getProductById(@PathVariable Long id) {
+        // APM DEMO: Intentional error for products with ID >= 3
+        if (id >= 3) {
+            String problematicValue = null;
+            // This will throw NullPointerException - APM will catch this!
+            int length = problematicValue.length();
+        }
         return productRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
