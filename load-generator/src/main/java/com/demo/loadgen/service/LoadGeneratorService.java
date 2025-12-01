@@ -58,6 +58,8 @@ public class LoadGeneratorService {
             String sessionId = "loadgen-session-" + System.currentTimeMillis() + "-" + i;
             userSessions.put(userId, sessionId);
         }
+        // Add admin user session for administrative operations
+        userSessions.put("admin", "loadgen-session-admin-" + System.currentTimeMillis());
         System.out.println("User sessions initialized: " + userSessions.size() + " sessions created");
     }
     
@@ -102,7 +104,8 @@ public class LoadGeneratorService {
         Flux.range(0, 3)
             .flatMap(i -> {
                 String userId = getRandomUser();
-                return browseAndAddToCart(userId);
+                String journeyId = generateJourneyId();
+                return browseAndAddToCart(userId, journeyId);
             })
             .subscribe();
     }
@@ -115,7 +118,8 @@ public class LoadGeneratorService {
         Flux.range(0, 2)
             .flatMap(i -> {
                 String userId = getRandomUser();
-                return completeCheckoutJourney(userId);
+                String journeyId = generateJourneyId();
+                return completeCheckoutJourney(userId, journeyId);
             })
             .subscribe();
     }
@@ -125,11 +129,14 @@ public class LoadGeneratorService {
     public void generateAdminOperations() {
         if (!loadEnabled) return;
         
-        viewAllOrders().subscribe();
+        String adminUser = "admin";
+        String journeyId = generateJourneyId();
+        
+        viewAllOrders(adminUser, journeyId).subscribe();
         
         // View multiple specific orders
         Flux.range(1, 5)
-            .flatMap(orderId -> viewOrder(orderId.longValue()))
+            .flatMap(orderId -> viewOrder(adminUser, journeyId, orderId.longValue()))
             .subscribe();
     }
     
@@ -163,93 +170,101 @@ public class LoadGeneratorService {
         String journeyId = generateJourneyId(); // Each journey gets unique ID
         int journeyType = ThreadLocalRandom.current().nextInt(5);
         
+        // Pass journeyId to all journey methods for consistent tracking
         return switch (journeyType) {
-            case 0 -> quickBrowseJourney(userId);
-            case 1 -> browseAndAddToCart(userId);
-            case 2 -> completeCheckoutJourney(userId);
-            case 3 -> returningCustomerJourney(userId);
-            default -> productExplorationJourney(userId);
+            case 0 -> quickBrowseJourney(userId, journeyId);
+            case 1 -> browseAndAddToCart(userId, journeyId);
+            case 2 -> completeCheckoutJourney(userId, journeyId);
+            case 3 -> returningCustomerJourney(userId, journeyId);
+            default -> productExplorationJourney(userId, journeyId);
         };
     }
     
-    private Mono<String> quickBrowseJourney(String userId) {
-        return browseProducts()
-            .then(viewProduct(getRandomProductId()))
-            .then(viewProduct(getRandomProductId()))
+    private Mono<String> quickBrowseJourney(String userId, String journeyId) {
+        return browseProducts(userId, journeyId)
+            .then(viewProduct(userId, journeyId, getRandomProductId()))
+            .then(viewProduct(userId, journeyId, getRandomProductId()))
             .then(Mono.just("Quick browse completed"));
     }
     
-    private Mono<String> browseAndAddToCart(String userId) {
-        return browseProducts()
-            .then(viewProduct(getRandomProductId()))
-            .then(addToCart(userId, getRandomProductId(), getRandomQuantity()))
-            .then(addToCart(userId, getRandomProductId(), getRandomQuantity()))
-            .then(viewCart(userId))
+    private Mono<String> browseAndAddToCart(String userId, String journeyId) {
+        return browseProducts(userId, journeyId)
+            .then(viewProduct(userId, journeyId, getRandomProductId()))
+            .then(addToCart(userId, journeyId, getRandomProductId(), getRandomQuantity()))
+            .then(addToCart(userId, journeyId, getRandomProductId(), getRandomQuantity()))
+            .then(viewCart(userId, journeyId))
             .then(Mono.just("Browse and add to cart completed"));
     }
     
-    private Mono<String> completeCheckoutJourney(String userId) {
+    private Mono<String> completeCheckoutJourney(String userId, String journeyId) {
         Long productId1 = getRandomProductId();
         Long productId2 = getRandomProductId();
         
-        return browseProducts()
-            .then(viewProduct(productId1))
-            .then(addToCart(userId, productId1, getRandomQuantity()))
-            .then(addToCart(userId, productId2, getRandomQuantity()))
-            .then(viewCart(userId))
-            .then(checkout(userId, Arrays.asList(
+        return browseProducts(userId, journeyId)
+            .then(viewProduct(userId, journeyId, productId1))
+            .then(addToCart(userId, journeyId, productId1, getRandomQuantity()))
+            .then(addToCart(userId, journeyId, productId2, getRandomQuantity()))
+            .then(viewCart(userId, journeyId))
+            .then(checkout(userId, journeyId, Arrays.asList(
                 new CheckoutItem(productId1, "Product" + productId1, 99.99, 1),
                 new CheckoutItem(productId2, "Product" + productId2, 79.99, 1)
             )))
-            .then(viewOrders(userId))
+            .then(viewOrders(userId, journeyId))
             .then(Mono.just("Complete checkout journey completed"));
     }
     
-    private Mono<String> returningCustomerJourney(String userId) {
-        return viewOrders(userId)
-            .then(browseProducts())
-            .then(viewProduct(getRandomProductId()))
-            .then(addToCart(userId, getRandomProductId(), getRandomQuantity()))
-            .then(viewCart(userId))
+    private Mono<String> returningCustomerJourney(String userId, String journeyId) {
+        return viewOrders(userId, journeyId)
+            .then(browseProducts(userId, journeyId))
+            .then(viewProduct(userId, journeyId, getRandomProductId()))
+            .then(addToCart(userId, journeyId, getRandomProductId(), getRandomQuantity()))
+            .then(viewCart(userId, journeyId))
             .then(Mono.just("Returning customer journey completed"));
     }
     
-    private Mono<String> productExplorationJourney(String userId) {
-        return browseProducts()
-            .then(viewProduct(1L))
-            .then(viewProduct(2L))
-            .then(viewProduct(3L))
-            .then(viewProduct(4L))
-            .then(viewProduct(5L))
+    private Mono<String> productExplorationJourney(String userId, String journeyId) {
+        return browseProducts(userId, journeyId)
+            .then(viewProduct(userId, journeyId, 1L))
+            .then(viewProduct(userId, journeyId, 2L))
+            .then(viewProduct(userId, journeyId, 3L))
+            .then(viewProduct(userId, journeyId, 4L))
+            .then(viewProduct(userId, journeyId, 5L))
             .then(Mono.just("Product exploration completed"));
     }
     
     // API calls with metrics
-    private Mono<String> browseProducts() {
+    private Mono<String> browseProducts(String userId, String journeyId) {
+        String sessionId = getSessionId(userId);
+        
         return makeRequest("browse_products",
             webClient.get()
                 .uri(gatewayUrl + "/api/products")
+                .header("X-Session-ID", sessionId)
+                .header("X-Journey-ID", journeyId)
                 .retrieve()
                 .bodyToMono(String.class)
         );
     }
     
-    private Mono<String> viewProduct(Long productId) {
+    private Mono<String> viewProduct(String userId, String journeyId, Long productId) {
+        String sessionId = getSessionId(userId);
+        
         return makeRequest("view_product",
             webClient.get()
                 .uri(gatewayUrl + "/api/products/" + productId)
+                .header("X-Session-ID", sessionId)
+                .header("X-Journey-ID", journeyId)
                 .retrieve()
                 .bodyToMono(String.class)
         );
     }
     
-    private Mono<String> addToCart(String userId, Long productId, int quantity) {
+    private Mono<String> addToCart(String userId, String journeyId, Long productId, int quantity) {
         AddToCartRequest request = new AddToCartRequest(
             productId, "Product" + productId, 99.99, quantity
         );
         
         String sessionId = getSessionId(userId);
-        String journeyId = generateJourneyId();
         
         return makeRequest("add_to_cart",
             webClient.post()
@@ -262,20 +277,22 @@ public class LoadGeneratorService {
         );
     }
     
-    private Mono<String> viewCart(String userId) {
+    private Mono<String> viewCart(String userId, String journeyId) {
+        String sessionId = getSessionId(userId);
+        
         return makeRequest("view_cart",
             webClient.get()
                 .uri(gatewayUrl + "/api/cart/" + userId)
+                .header("X-Session-ID", sessionId)
+                .header("X-Journey-ID", journeyId)
                 .retrieve()
                 .bodyToMono(String.class)
         );
     }
     
-    private Mono<String> checkout(String userId, List<CheckoutItem> items) {
+    private Mono<String> checkout(String userId, String journeyId, List<CheckoutItem> items) {
         CheckoutRequest request = new CheckoutRequest(userId, items);
-        
         String sessionId = getSessionId(userId);
-        String journeyId = generateJourneyId();
         
         return makeRequest("checkout",
             webClient.post()
@@ -288,28 +305,40 @@ public class LoadGeneratorService {
         );
     }
     
-    private Mono<String> viewOrders(String userId) {
+    private Mono<String> viewOrders(String userId, String journeyId) {
+        String sessionId = getSessionId(userId);
+        
         return makeRequest("view_orders",
             webClient.get()
                 .uri(gatewayUrl + "/api/orders/user/" + userId)
+                .header("X-Session-ID", sessionId)
+                .header("X-Journey-ID", journeyId)
                 .retrieve()
                 .bodyToMono(String.class)
         );
     }
     
-    private Mono<String> viewAllOrders() {
+    private Mono<String> viewAllOrders(String userId, String journeyId) {
+        String sessionId = getSessionId(userId);
+        
         return makeRequest("view_all_orders",
             webClient.get()
                 .uri(gatewayUrl + "/api/orders")
+                .header("X-Session-ID", sessionId)
+                .header("X-Journey-ID", journeyId)
                 .retrieve()
                 .bodyToMono(String.class)
         );
     }
     
-    private Mono<String> viewOrder(Long orderId) {
+    private Mono<String> viewOrder(String userId, String journeyId, Long orderId) {
+        String sessionId = getSessionId(userId);
+        
         return makeRequest("view_order",
             webClient.get()
                 .uri(gatewayUrl + "/api/orders/" + orderId)
+                .header("X-Session-ID", sessionId)
+                .header("X-Journey-ID", journeyId)
                 .retrieve()
                 .bodyToMono(String.class)
                 .onErrorResume(e -> Mono.just("Order not found"))
