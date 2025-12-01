@@ -5,6 +5,37 @@ const API_BASE_URL = 'http://localhost:8080/api';
 let currentUserId = 'user123';
 let cartData = null;
 
+// APM Funnel Tracking: Session and Journey IDs
+let sessionId = null;
+let journeyId = null;
+
+// Initialize or retrieve session ID (persists across page reloads)
+function initializeSessionTracking() {
+    // Session ID: Persists across page reloads (localStorage)
+    sessionId = localStorage.getItem('sessionId');
+    if (!sessionId) {
+        sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('sessionId', sessionId);
+    }
+    
+    // Journey ID: Unique for each shopping journey (session storage - cleared on tab close)
+    journeyId = sessionStorage.getItem('journeyId');
+    if (!journeyId) {
+        journeyId = 'journey-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        sessionStorage.setItem('journeyId', journeyId);
+    }
+    
+    console.log('Tracking initialized - SessionID:', sessionId, 'JourneyID:', journeyId);
+}
+
+// Get tracking headers
+function getTrackingHeaders() {
+    return {
+        'X-Session-ID': sessionId,
+        'X-Journey-ID': journeyId
+    };
+}
+
 // Product icons map
 const productIcons = {
     'Laptop': '💻',
@@ -17,6 +48,7 @@ const productIcons = {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    initializeSessionTracking();
     initializeNavigation();
     initializeUserSection();
     loadProducts();
@@ -49,9 +81,27 @@ function switchPage(page) {
         // Load data for the page
         if (page === 'cart') {
             loadCart();
+            // APM Funnel Tracking: Track cart view event
+            trackCartViewEvent();
         } else if (page === 'orders') {
             loadOrders();
         }
+    }
+}
+
+// APM Funnel Tracking: Track cart view event
+async function trackCartViewEvent() {
+    try {
+        await fetch(`${API_BASE_URL}/cart/${currentUserId}/view-event`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getTrackingHeaders()
+            }
+        });
+        console.log('FUNNEL_TRACKING: Cart view event tracked');
+    } catch (error) {
+        console.error('Failed to track cart view event:', error);
     }
 }
 
@@ -286,6 +336,16 @@ async function checkout() {
     }
     
     try {
+        // APM Funnel Tracking: Track checkout initiated event
+        console.log('FUNNEL_TRACKING: Checkout initiated');
+        await fetch(`${API_BASE_URL}/cart/${currentUserId}/checkout-initiated`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getTrackingHeaders()
+            }
+        });
+        
         const checkoutData = {
             userId: currentUserId,
             items: cartData.items.map(item => ({
@@ -299,19 +359,26 @@ async function checkout() {
         const response = await fetch(`${API_BASE_URL}/orders/checkout`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...getTrackingHeaders()
             },
             body: JSON.stringify(checkoutData)
         });
         
         if (response.ok) {
             const order = await response.json();
+            console.log('FUNNEL_TRACKING: Checkout completed successfully');
             showOrderConfirmation(order);
-            clearCart();
+            // Note: Cart is now automatically cleared by the backend after successful checkout
+            // Reload cart to reflect this
+            loadCart();
+            updateCartBadge();
         } else {
+            console.log('FUNNEL_DROP_OFF: Checkout failed');
             throw new Error('Checkout failed');
         }
     } catch (error) {
+        console.log('FUNNEL_DROP_OFF: Checkout error -', error.message);
         showToast('Checkout failed: ' + error.message, 'error');
         console.error('Error during checkout:', error);
     }

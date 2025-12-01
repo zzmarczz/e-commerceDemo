@@ -2,6 +2,7 @@ package com.demo.gateway.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -120,13 +121,78 @@ public class GatewayController {
                 });
     }
 
+    // APM Funnel Tracking: Cart View Event
+    @PostMapping("/cart/{userId}/view-event")
+    public Mono<ResponseEntity<String>> trackCartView(@PathVariable String userId,
+                                                      @RequestHeader(value = "X-Session-ID", required = false) String sessionId,
+                                                      @RequestHeader(value = "X-Journey-ID", required = false) String journeyId) {
+        WebClient.RequestHeadersSpec<?> request = webClientBuilder.build()
+                .post()
+                .uri(cartServiceUrl + "/api/cart/" + userId + "/view-event");
+        
+        if (sessionId != null) {
+            request = request.header("X-Session-ID", sessionId);
+        }
+        if (journeyId != null) {
+            request = request.header("X-Journey-ID", journeyId);
+        }
+        
+        return request
+                .retrieve()
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
+    }
+
+    // APM Funnel Tracking: Checkout Initiated Event
+    @PostMapping("/cart/{userId}/checkout-initiated")
+    public Mono<ResponseEntity<String>> trackCheckoutInitiated(@PathVariable String userId,
+                                                               @RequestHeader(value = "X-Session-ID", required = false) String sessionId,
+                                                               @RequestHeader(value = "X-Journey-ID", required = false) String journeyId) {
+        WebClient.RequestHeadersSpec<?> request = webClientBuilder.build()
+                .post()
+                .uri(cartServiceUrl + "/api/cart/" + userId + "/checkout-initiated");
+        
+        if (sessionId != null) {
+            request = request.header("X-Session-ID", sessionId);
+        }
+        if (journeyId != null) {
+            request = request.header("X-Journey-ID", journeyId);
+        }
+        
+        return request
+                .retrieve()
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
+    }
+
     // Order Service Endpoints
     @PostMapping("/orders/checkout")
-    public Mono<ResponseEntity<String>> checkout(@RequestBody String requestBody) {
-        return webClientBuilder.build()
+    public Mono<ResponseEntity<String>> checkout(@RequestBody String requestBody,
+                                                 @RequestHeader(value = "X-Session-ID", required = false) String sessionId,
+                                                 @RequestHeader(value = "X-Journey-ID", required = false) String journeyId) {
+        WebClient.RequestBodySpec request = webClientBuilder.build()
                 .post()
                 .uri(orderServiceUrl + "/api/orders/checkout")
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON);
+        
+        if (sessionId != null) {
+            request = request.header("X-Session-ID", sessionId);
+        }
+        if (journeyId != null) {
+            request = request.header("X-Journey-ID", journeyId);
+        }
+        
+        return request
                 .bodyValue(requestBody)
                 .retrieve()
                 .toEntity(String.class)

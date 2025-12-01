@@ -4,6 +4,8 @@ import com.demo.cart.dto.AddToCartRequest;
 import com.demo.cart.model.Cart;
 import com.demo.cart.model.CartItem;
 import com.demo.cart.repository.CartRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/cart")
 public class CartController {
+
+    private static final Logger logger = LoggerFactory.getLogger(CartController.class);
 
     @Autowired
     private CartRepository cartRepository;
@@ -108,6 +112,54 @@ public class CartController {
                     return ResponseEntity.ok().build();
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    // APM Funnel Tracking: Cart View Event
+    @PostMapping("/{userId}/view-event")
+    public ResponseEntity<Cart> trackCartView(@PathVariable String userId,
+                                              @RequestHeader(value = "X-Session-ID", required = false) String sessionId,
+                                              @RequestHeader(value = "X-Journey-ID", required = false) String journeyId) {
+        logger.info("FUNNEL_TRACKING: Cart viewed - userId={}, sessionId={}, journeyId={}", 
+                    userId, sessionId, journeyId);
+        
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseGet(() -> cartRepository.save(new Cart(userId)));
+        
+        int itemCount = cart.getItems().size();
+        double totalValue = cart.getItems().stream()
+                .mapToDouble(item -> item.getPrice() * item.getQuantity())
+                .sum();
+        
+        logger.info("FUNNEL_METRICS: Cart viewed - items={}, totalValue=${}, userId={}", 
+                    itemCount, String.format("%.2f", totalValue), userId);
+        
+        return ResponseEntity.ok(cart);
+    }
+
+    // APM Funnel Tracking: Checkout Initiated Event
+    @PostMapping("/{userId}/checkout-initiated")
+    public ResponseEntity<?> trackCheckoutInitiated(@PathVariable String userId,
+                                                    @RequestHeader(value = "X-Session-ID", required = false) String sessionId,
+                                                    @RequestHeader(value = "X-Journey-ID", required = false) String journeyId) {
+        Cart cart = cartRepository.findByUserId(userId).orElse(null);
+        
+        if (cart == null || cart.getItems().isEmpty()) {
+            logger.warn("FUNNEL_DROP_OFF: Checkout initiated with empty cart - userId={}, sessionId={}", 
+                       userId, sessionId);
+            return ResponseEntity.badRequest()
+                    .body("{\"error\":\"Empty Cart\",\"message\":\"Cannot checkout with empty cart\"}");
+        }
+        
+        int itemCount = cart.getItems().size();
+        double totalValue = cart.getItems().stream()
+                .mapToDouble(item -> item.getPrice() * item.getQuantity())
+                .sum();
+        
+        logger.info("FUNNEL_TRACKING: Checkout initiated - userId={}, sessionId={}, journeyId={}, items={}, totalValue=${}", 
+                    userId, sessionId, journeyId, itemCount, String.format("%.2f", totalValue));
+        
+        return ResponseEntity.ok()
+                .body("{\"status\":\"checkout_initiated\",\"items\":" + itemCount + ",\"totalValue\":" + totalValue + "}");
     }
 }
 

@@ -5,9 +5,13 @@ import com.demo.order.model.Order;
 import com.demo.order.model.OrderItem;
 import com.demo.order.model.OrderStatus;
 import com.demo.order.repository.OrderRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.HashMap;
 import java.util.List;
@@ -17,21 +21,54 @@ import java.util.Map;
 @RequestMapping("/api/orders")
 public class OrderController {
 
+    private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
+
     @Autowired
     private OrderRepository orderRepository;
+    
+    @Autowired
+    private WebClient.Builder webClientBuilder;
+    
+    @Value("${services.cart.url:http://localhost:8082}")
+    private String cartServiceUrl;
     
     // APM Demo: Simulate slow response times
     private static volatile boolean slowModeEnabled = false;
     private static volatile int slowModeDelayMs = 5000; // Default 5 seconds
 
     @PostMapping("/checkout")
-    public ResponseEntity<Order> checkout(@RequestBody CheckoutRequest request) {
-        // Calculate total
+    public ResponseEntity<Order> checkout(@RequestBody CheckoutRequest request,
+                                         @RequestHeader(value = "X-Session-ID", required = false) String sessionId,
+                                         @RequestHeader(value = "X-Journey-ID", required = false) String journeyId) {
+        
+        String userId = request.getUserId();
+        int itemCount = request.getItems().size();
+        
+        logger.info("FUNNEL_TRACKING: Checkout started - userId={}, sessionId={}, journeyId={}, items={}", 
+                    userId, sessionId, journeyId, itemCount);
+        
+        // Stage 1: Validate cart
+        logger.info("FUNNEL_STAGE: Validating cart - userId={}", userId);
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            logger.warn("FUNNEL_DROP_OFF: Checkout validation failed - empty cart - userId={}, sessionId={}", 
+                       userId, sessionId);
+            return ResponseEntity.badRequest().build();
+        }
+        
+        logger.info("FUNNEL_STAGE: Cart validated successfully - userId={}, items={}", userId, itemCount);
+        
+        // Stage 2: Calculate total
+        logger.info("FUNNEL_STAGE: Calculating order total - userId={}", userId);
         double total = request.getItems().stream()
                 .mapToDouble(item -> item.getPrice() * item.getQuantity())
                 .sum();
+        
+        logger.info("FUNNEL_METRICS: Order total calculated - userId={}, totalValue=${}", 
+                    userId, String.format("%.2f", total));
 
-        Order order = new Order(request.getUserId(), total);
+        // Stage 3: Create order
+        logger.info("FUNNEL_STAGE: Creating order - userId={}", userId);
+        Order order = new Order(userId, total);
 
         // Add items to order
         request.getItems().forEach(item -> {
@@ -46,6 +83,29 @@ public class OrderController {
 
         order.setStatus(OrderStatus.CONFIRMED);
         Order savedOrder = orderRepository.save(order);
+        
+        logger.info("FUNNEL_STAGE: Order created - orderId={}, userId={}", savedOrder.getId(), userId);
+        
+        // Stage 4: Clear cart after successful checkout
+        logger.info("FUNNEL_STAGE: Clearing cart after successful checkout - userId={}", userId);
+        try {
+            webClientBuilder.build()
+                    .delete()
+                    .uri(cartServiceUrl + "/api/cart/" + userId)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+            
+            logger.info("FUNNEL_STAGE: Cart cleared successfully - userId={}", userId);
+        } catch (Exception e) {
+            logger.error("FUNNEL_ERROR: Failed to clear cart after checkout - userId={}, error={}", 
+                        userId, e.getMessage());
+            // Don't fail the checkout if cart clearing fails
+        }
+        
+        // Stage 5: Checkout completed
+        logger.info("FUNNEL_TRACKING: Checkout completed successfully - orderId={}, userId={}, sessionId={}, journeyId={}, totalValue=${}", 
+                    savedOrder.getId(), userId, sessionId, journeyId, String.format("%.2f", total));
         
         return ResponseEntity.ok(savedOrder);
     }
