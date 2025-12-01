@@ -96,7 +96,8 @@ public class LoadGeneratorService {
             );
     }
     
-    // Medium frequency - every 5 seconds
+    // Medium frequency - every 5 seconds  
+    // Mix of behaviors: some add and abandon, some view cart and abandon
     @Scheduled(fixedDelay = 5000)
     public void generateCartOperations() {
         if (!loadEnabled) return;
@@ -105,12 +106,18 @@ public class LoadGeneratorService {
             .flatMap(i -> {
                 String userId = getRandomUser();
                 String journeyId = generateJourneyId();
-                return browseAndAddToCart(userId, journeyId);
+                // 50% add and abandon, 50% view cart and abandon
+                if (ThreadLocalRandom.current().nextBoolean()) {
+                    return addToCartAndAbandon(userId, journeyId);
+                } else {
+                    return viewCartAndAbandon(userId, journeyId);
+                }
             })
             .subscribe();
     }
     
     // Low frequency - every 10 seconds
+    // These are actual successful checkouts
     @Scheduled(fixedDelay = 10000)
     public void generateCheckouts() {
         if (!loadEnabled) return;
@@ -167,33 +174,74 @@ public class LoadGeneratorService {
     
     private Mono<String> simulateUserJourney() {
         String userId = getRandomUser();
-        String journeyId = generateJourneyId(); // Each journey gets unique ID
-        int journeyType = ThreadLocalRandom.current().nextInt(5);
+        String journeyId = generateJourneyId();
         
-        // Pass journeyId to all journey methods for consistent tracking
-        return switch (journeyType) {
-            case 0 -> quickBrowseJourney(userId, journeyId);
-            case 1 -> browseAndAddToCart(userId, journeyId);
-            case 2 -> completeCheckoutJourney(userId, journeyId);
-            case 3 -> returningCustomerJourney(userId, journeyId);
-            default -> productExplorationJourney(userId, journeyId);
-        };
+        // Realistic drop-off distribution for APM funnel demo
+        int random = ThreadLocalRandom.current().nextInt(100);
+        
+        // 40% - Browse only (window shopping, drop off immediately)
+        if (random < 40) {
+            return browseOnlyJourney(userId, journeyId);
+        }
+        // 20% - Browse and add to cart (but abandon, don't view cart)
+        else if (random < 60) {
+            return addToCartAndAbandon(userId, journeyId);
+        }
+        // 15% - View cart but abandon (drop off before checkout)
+        else if (random < 75) {
+            return viewCartAndAbandon(userId, journeyId);
+        }
+        // 25% - Complete purchase (full conversion)
+        else {
+            return completeCheckoutJourney(userId, journeyId);
+        }
+        
+        // Expected funnel:
+        // 100% Browse
+        // 60% Add to Cart (40% drop)
+        // 40% View Cart (33% drop)  
+        // 25% Purchase (38% drop from cart view)
+        // Overall Conversion: 25%
     }
     
-    private Mono<String> quickBrowseJourney(String userId, String journeyId) {
+    // REALISTIC DROP-OFF JOURNEYS FOR APM DEMO
+    
+    // 40% of users: Browse only, never add to cart (immediate drop-off)
+    private Mono<String> browseOnlyJourney(String userId, String journeyId) {
         return browseProducts(userId, journeyId)
             .then(viewProduct(userId, journeyId, getRandomProductId()))
             .then(viewProduct(userId, journeyId, getRandomProductId()))
-            .then(Mono.just("Quick browse completed"));
+            .then(Mono.just("Browse only - dropped off"));
     }
     
-    private Mono<String> browseAndAddToCart(String userId, String journeyId) {
+    // 20% of users: Add to cart but abandon (don't view cart page)
+    private Mono<String> addToCartAndAbandon(String userId, String journeyId) {
+        return browseProducts(userId, journeyId)
+            .then(viewProduct(userId, journeyId, getRandomProductId()))
+            .then(addToCart(userId, journeyId, getRandomProductId(), getRandomQuantity()))
+            .then(Mono.just("Added to cart - abandoned without viewing"));
+    }
+    
+    // 15% of users: View cart but abandon before checkout
+    private Mono<String> viewCartAndAbandon(String userId, String journeyId) {
         return browseProducts(userId, journeyId)
             .then(viewProduct(userId, journeyId, getRandomProductId()))
             .then(addToCart(userId, journeyId, getRandomProductId(), getRandomQuantity()))
             .then(addToCart(userId, journeyId, getRandomProductId(), getRandomQuantity()))
             .then(viewCart(userId, journeyId))
-            .then(Mono.just("Browse and add to cart completed"));
+            .then(Mono.just("Viewed cart - abandoned before checkout"));
+    }
+    
+    // LEGACY JOURNEYS (kept for scheduled operations)
+    
+    private Mono<String> quickBrowseJourney(String userId, String journeyId) {
+        // Same as browseOnlyJourney
+        return browseOnlyJourney(userId, journeyId);
+    }
+    
+    private Mono<String> browseAndAddToCart(String userId, String journeyId) {
+        // Same as viewCartAndAbandon
+        return viewCartAndAbandon(userId, journeyId);
     }
     
     private Mono<String> completeCheckoutJourney(String userId, String journeyId) {
@@ -214,22 +262,20 @@ public class LoadGeneratorService {
     }
     
     private Mono<String> returningCustomerJourney(String userId, String journeyId) {
+        // Returning customer views old orders then browses (often doesn't buy)
         return viewOrders(userId, journeyId)
             .then(browseProducts(userId, journeyId))
             .then(viewProduct(userId, journeyId, getRandomProductId()))
-            .then(addToCart(userId, journeyId, getRandomProductId(), getRandomQuantity()))
-            .then(viewCart(userId, journeyId))
-            .then(Mono.just("Returning customer journey completed"));
+            .then(Mono.just("Returning customer - browsed only"));
     }
     
     private Mono<String> productExplorationJourney(String userId, String journeyId) {
+        // Window shopping - browse multiple products but don't buy
         return browseProducts(userId, journeyId)
             .then(viewProduct(userId, journeyId, 1L))
             .then(viewProduct(userId, journeyId, 2L))
             .then(viewProduct(userId, journeyId, 3L))
-            .then(viewProduct(userId, journeyId, 4L))
-            .then(viewProduct(userId, journeyId, 5L))
-            .then(Mono.just("Product exploration completed"));
+            .then(Mono.just("Product exploration - no purchase"));
     }
     
     // API calls with metrics
