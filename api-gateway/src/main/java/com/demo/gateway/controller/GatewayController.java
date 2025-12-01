@@ -6,6 +6,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 @RestController
@@ -26,99 +27,161 @@ public class GatewayController {
 
     // Product Service Endpoints
     @GetMapping("/products")
-    public Mono<String> getAllProducts() {
+    public Mono<ResponseEntity<String>> getAllProducts() {
         return webClientBuilder.build()
                 .get()
                 .uri(productServiceUrl + "/api/products")
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     @GetMapping("/products/{id}")
-    public Mono<String> getProduct(@PathVariable Long id) {
+    public Mono<ResponseEntity<String>> getProduct(@PathVariable Long id) {
         return webClientBuilder.build()
                 .get()
                 .uri(productServiceUrl + "/api/products/" + id)
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     // Cart Service Endpoints
     @GetMapping("/cart/{userId}")
-    public Mono<String> getCart(@PathVariable String userId) {
+    public Mono<ResponseEntity<String>> getCart(@PathVariable String userId) {
         return webClientBuilder.build()
                 .get()
                 .uri(cartServiceUrl + "/api/cart/" + userId)
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     @PostMapping("/cart/{userId}/items")
-    public Mono<String> addToCart(@PathVariable String userId, @RequestBody String requestBody) {
+    public Mono<ResponseEntity<String>> addToCart(@PathVariable String userId, @RequestBody String requestBody) {
         return webClientBuilder.build()
                 .post()
                 .uri(cartServiceUrl + "/api/cart/" + userId + "/items")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(requestBody)
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    // Pass through client errors (4xx) and server errors (5xx) with original status and body
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     @DeleteMapping("/cart/{userId}/items/{itemId}")
-    public Mono<String> removeFromCart(@PathVariable String userId, @PathVariable Long itemId) {
+    public Mono<ResponseEntity<String>> removeFromCart(@PathVariable String userId, @PathVariable Long itemId) {
         return webClientBuilder.build()
                 .delete()
                 .uri(cartServiceUrl + "/api/cart/" + userId + "/items/" + itemId)
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     @DeleteMapping("/cart/{userId}")
-    public Mono<String> clearCart(@PathVariable String userId) {
+    public Mono<ResponseEntity<String>> clearCart(@PathVariable String userId) {
         return webClientBuilder.build()
                 .delete()
                 .uri(cartServiceUrl + "/api/cart/" + userId)
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     // Order Service Endpoints
     @PostMapping("/orders/checkout")
-    public Mono<String> checkout(@RequestBody String requestBody) {
+    public Mono<ResponseEntity<String>> checkout(@RequestBody String requestBody) {
         return webClientBuilder.build()
                 .post()
                 .uri(orderServiceUrl + "/api/orders/checkout")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(requestBody)
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    // Pass through client errors (4xx) and server errors (5xx) with original status and body
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     @GetMapping("/orders/user/{userId}")
-    public Mono<String> getUserOrders(@PathVariable String userId) {
+    public Mono<ResponseEntity<String>> getUserOrders(@PathVariable String userId) {
         return webClientBuilder.build()
                 .get()
                 .uri(orderServiceUrl + "/api/orders/user/" + userId)
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     @GetMapping("/orders/{orderId}")
-    public Mono<String> getOrder(@PathVariable Long orderId) {
+    public Mono<ResponseEntity<String>> getOrder(@PathVariable Long orderId) {
         return webClientBuilder.build()
                 .get()
                 .uri(orderServiceUrl + "/api/orders/" + orderId)
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     @GetMapping("/orders")
-    public Mono<String> getAllOrders() {
+    public Mono<ResponseEntity<String>> getAllOrders() {
         return webClientBuilder.build()
                 .get()
                 .uri(orderServiceUrl + "/api/orders")
                 .retrieve()
-                .bodyToMono(String.class);
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
     }
 
     // Health check endpoint
