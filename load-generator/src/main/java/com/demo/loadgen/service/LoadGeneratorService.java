@@ -39,9 +39,30 @@ public class LoadGeneratorService {
     
     private final Map<String, AtomicInteger> actionCounts = new HashMap<>();
     
+    // APM Funnel Tracking: Session IDs for each simulated user
+    private final Map<String, String> userSessions = new HashMap<>();
+    
     public LoadGeneratorService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.build();
         initializeActionCounts();
+        initializeUserSessions();
+    }
+    
+    private void initializeUserSessions() {
+        // Pre-create session IDs for all simulated users
+        for (int i = 1; i <= numberOfUsers; i++) {
+            String userId = "user" + i;
+            String sessionId = "loadgen-session-" + System.currentTimeMillis() + "-" + i;
+            userSessions.put(userId, sessionId);
+        }
+    }
+    
+    private String getSessionId(String userId) {
+        return userSessions.getOrDefault(userId, "loadgen-session-unknown");
+    }
+    
+    private String generateJourneyId() {
+        return "loadgen-journey-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
     
     private void initializeActionCounts() {
@@ -135,6 +156,7 @@ public class LoadGeneratorService {
     
     private Mono<String> simulateUserJourney() {
         String userId = getRandomUser();
+        String journeyId = generateJourneyId(); // Each journey gets unique ID
         int journeyType = ThreadLocalRandom.current().nextInt(5);
         
         return switch (journeyType) {
@@ -222,9 +244,14 @@ public class LoadGeneratorService {
             productId, "Product" + productId, 99.99, quantity
         );
         
+        String sessionId = getSessionId(userId);
+        String journeyId = generateJourneyId();
+        
         return makeRequest("add_to_cart",
             webClient.post()
                 .uri(gatewayUrl + "/api/cart/" + userId + "/items")
+                .header("X-Session-ID", sessionId)
+                .header("X-Journey-ID", journeyId)
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(String.class)
@@ -243,9 +270,14 @@ public class LoadGeneratorService {
     private Mono<String> checkout(String userId, List<CheckoutItem> items) {
         CheckoutRequest request = new CheckoutRequest(userId, items);
         
+        String sessionId = getSessionId(userId);
+        String journeyId = generateJourneyId();
+        
         return makeRequest("checkout",
             webClient.post()
                 .uri(gatewayUrl + "/api/orders/checkout")
+                .header("X-Session-ID", sessionId)
+                .header("X-Journey-ID", journeyId)
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(String.class)
