@@ -54,6 +54,15 @@ public class CartController {
             }
         }
 
+        // BUG: Simulate a critical application error for APM demo (Monitor product)
+        // This demonstrates how APM detects NullPointerException and stack traces
+        if (request.getProductName().equalsIgnoreCase("Monitor")) {
+            // Intentionally trigger NullPointerException
+            String nullString = null;
+            // This will throw: java.lang.NullPointerException: Cannot invoke "String.length()" because "nullString" is null
+            int length = nullString.length();
+        }
+
         // Check if item already exists
         boolean itemExists = false;
         for (CartItem item : cart.getItems()) {
