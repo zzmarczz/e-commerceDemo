@@ -43,6 +43,15 @@ public class LoadGeneratorService {
     // APM Funnel Tracking: Session IDs for each simulated user
     private final Map<String, String> userSessions = new HashMap<>();
     
+    // User Personas: Each user has a fixed behavior type for realistic funnel
+    private final Map<String, String> userPersonas = new HashMap<>();
+    
+    // Persona types
+    private static final String PERSONA_BROWSE_ONLY = "browse_only";
+    private static final String PERSONA_ADD_ABANDON = "add_abandon";
+    private static final String PERSONA_VIEW_ABANDON = "view_abandon";
+    private static final String PERSONA_BUYER = "buyer";
+    
     public LoadGeneratorService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.build();
         initializeActionCounts();
@@ -50,17 +59,45 @@ public class LoadGeneratorService {
     
     @PostConstruct
     private void initializeUserSessions() {
-        // Pre-create session IDs for all simulated users
+        // Pre-create session IDs and assign personas for realistic funnel
         // This runs AFTER @Value injection, so numberOfUsers is available
-        System.out.println("Initializing " + numberOfUsers + " user sessions for APM tracking...");
+        System.out.println("Initializing " + numberOfUsers + " user sessions and personas for APM tracking...");
+        
+        // Calculate persona distribution (40% browse, 20% add-abandon, 15% view-abandon, 25% buyer)
+        int browseOnlyCount = (int)(numberOfUsers * 0.40);
+        int addAbandonCount = (int)(numberOfUsers * 0.20);
+        int viewAbandonCount = (int)(numberOfUsers * 0.15);
+        // Remaining users are buyers
+        
         for (int i = 1; i <= numberOfUsers; i++) {
             String userId = "user" + i;
             String sessionId = "loadgen-session-" + System.currentTimeMillis() + "-" + i;
             userSessions.put(userId, sessionId);
+            
+            // Assign persona based on user number
+            String persona;
+            if (i <= browseOnlyCount) {
+                persona = PERSONA_BROWSE_ONLY;
+            } else if (i <= browseOnlyCount + addAbandonCount) {
+                persona = PERSONA_ADD_ABANDON;
+            } else if (i <= browseOnlyCount + addAbandonCount + viewAbandonCount) {
+                persona = PERSONA_VIEW_ABANDON;
+            } else {
+                persona = PERSONA_BUYER;
+            }
+            userPersonas.put(userId, persona);
         }
+        
         // Add admin user session for administrative operations
         userSessions.put("admin", "loadgen-session-admin-" + System.currentTimeMillis());
+        
+        // Print distribution
         System.out.println("User sessions initialized: " + userSessions.size() + " sessions created");
+        System.out.println("Persona distribution:");
+        System.out.println("  - Browse only (40%): " + browseOnlyCount + " users (user1-user" + browseOnlyCount + ")");
+        System.out.println("  - Add & abandon (20%): " + addAbandonCount + " users (user" + (browseOnlyCount+1) + "-user" + (browseOnlyCount+addAbandonCount) + ")");
+        System.out.println("  - View cart & abandon (15%): " + viewAbandonCount + " users (user" + (browseOnlyCount+addAbandonCount+1) + "-user" + (browseOnlyCount+addAbandonCount+viewAbandonCount) + ")");
+        System.out.println("  - Buyers (25%): " + (numberOfUsers - browseOnlyCount - addAbandonCount - viewAbandonCount) + " users (user" + (browseOnlyCount+addAbandonCount+viewAbandonCount+1) + "-user" + numberOfUsers + ")");
     }
     
     private String getSessionId(String userId) {
@@ -176,32 +213,25 @@ public class LoadGeneratorService {
         String userId = getRandomUser();
         String journeyId = generateJourneyId();
         
-        // Realistic drop-off distribution for APM funnel demo
-        int random = ThreadLocalRandom.current().nextInt(100);
+        // Get user's assigned persona and execute corresponding journey
+        String persona = userPersonas.getOrDefault(userId, PERSONA_BROWSE_ONLY);
         
-        // 40% - Browse only (window shopping, drop off immediately)
-        if (random < 40) {
-            return browseOnlyJourney(userId, journeyId);
-        }
-        // 20% - Browse and add to cart (but abandon, don't view cart)
-        else if (random < 60) {
-            return addToCartAndAbandon(userId, journeyId);
-        }
-        // 15% - View cart but abandon (drop off before checkout)
-        else if (random < 75) {
-            return viewCartAndAbandon(userId, journeyId);
-        }
-        // 25% - Complete purchase (full conversion)
-        else {
-            return completeCheckoutJourney(userId, journeyId);
-        }
+        return switch (persona) {
+            case PERSONA_BROWSE_ONLY -> browseOnlyJourney(userId, journeyId);
+            case PERSONA_ADD_ABANDON -> addToCartAndAbandon(userId, journeyId);
+            case PERSONA_VIEW_ABANDON -> viewCartAndAbandon(userId, journeyId);
+            case PERSONA_BUYER -> completeCheckoutJourney(userId, journeyId);
+            default -> browseOnlyJourney(userId, journeyId);
+        };
         
-        // Expected funnel:
-        // 100% Browse
-        // 60% Add to Cart (40% drop)
-        // 40% View Cart (33% drop)  
-        // 25% Purchase (38% drop from cart view)
-        // Overall Conversion: 25%
+        // With persona-based behavior:
+        // - Users 1-40: ALWAYS browse only (never add to cart)
+        // - Users 41-60: ALWAYS add to cart and abandon
+        // - Users 61-75: ALWAYS view cart and abandon
+        // - Users 76-100: ALWAYS complete purchase
+        //
+        // Result: Consistent funnel regardless of timeframe!
+        // Browse: 100 sessions, Add Cart: 60 sessions, View: 40 sessions, Purchase: 25 sessions
     }
     
     // REALISTIC DROP-OFF JOURNEYS FOR APM DEMO
