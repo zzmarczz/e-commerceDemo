@@ -1,6 +1,7 @@
 package com.demo.loadgen.service;
 
 import com.demo.loadgen.model.*;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -45,16 +46,19 @@ public class LoadGeneratorService {
     public LoadGeneratorService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.build();
         initializeActionCounts();
-        initializeUserSessions();
     }
     
+    @PostConstruct
     private void initializeUserSessions() {
         // Pre-create session IDs for all simulated users
+        // This runs AFTER @Value injection, so numberOfUsers is available
+        System.out.println("Initializing " + numberOfUsers + " user sessions for APM tracking...");
         for (int i = 1; i <= numberOfUsers; i++) {
             String userId = "user" + i;
             String sessionId = "loadgen-session-" + System.currentTimeMillis() + "-" + i;
             userSessions.put(userId, sessionId);
         }
+        System.out.println("User sessions initialized: " + userSessions.size() + " sessions created");
     }
     
     private String getSessionId(String userId) {
