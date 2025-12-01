@@ -7,6 +7,7 @@ import com.demo.cart.repository.CartRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,23 +19,41 @@ public class CartController {
 
     @Autowired
     private CartRepository cartRepository;
+    
+    /**
+     * Safely get or create a cart, handling race conditions
+     * If multiple threads try to create a cart simultaneously, one will succeed
+     * and the others will catch the constraint violation and retry the lookup
+     */
+    private Cart getOrCreateCart(String userId) {
+        // First attempt: try to find existing cart
+        return cartRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    try {
+                        // Not found, try to create new cart
+                        Cart newCart = new Cart(userId);
+                        return cartRepository.save(newCart);
+                    } catch (DataIntegrityViolationException e) {
+                        // Race condition: another thread created the cart
+                        // between our check and save. Retry the lookup.
+                        logger.debug("Race condition detected creating cart for userId={}, retrying lookup", userId);
+                        return cartRepository.findByUserId(userId)
+                                .orElseThrow(() -> new RuntimeException("Failed to get or create cart for user: " + userId));
+                    }
+                });
+    }
 
     @GetMapping("/{userId}")
     public ResponseEntity<Cart> getCart(@PathVariable String userId) {
-        Cart cart = cartRepository.findByUserId(userId)
-                .orElseGet(() -> cartRepository.save(new Cart(userId)));
+        Cart cart = getOrCreateCart(userId);
         return ResponseEntity.ok(cart);
     }
 
     @PostMapping("/{userId}/items")
     public ResponseEntity<?> addToCart(@PathVariable String userId, 
                                          @RequestBody AddToCartRequest request) {
-        // Find or create cart - if new, save it first
-        Cart cart = cartRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    Cart newCart = new Cart(userId);
-                    return cartRepository.save(newCart);
-                });
+        // Find or create cart (handles race conditions)
+        Cart cart = getOrCreateCart(userId);
 
         // BUSINESS RULE: Check keyboard quantity limit (max 5 per customer)
         if (request.getProductName().equalsIgnoreCase("Keyboard")) {
@@ -122,8 +141,7 @@ public class CartController {
         logger.info("FUNNEL_TRACKING: Cart viewed - userId={}, sessionId={}, journeyId={}", 
                     userId, sessionId, journeyId);
         
-        Cart cart = cartRepository.findByUserId(userId)
-                .orElseGet(() -> cartRepository.save(new Cart(userId)));
+        Cart cart = getOrCreateCart(userId);
         
         int itemCount = cart.getItems().size();
         double totalValue = cart.getItems().stream()
