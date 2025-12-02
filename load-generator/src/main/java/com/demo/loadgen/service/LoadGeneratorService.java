@@ -134,37 +134,24 @@ public class LoadGeneratorService {
     }
     
     // Medium frequency - every 5 seconds  
-    // Mix of behaviors: some add and abandon, some view cart and abandon
+    // Generates journeys respecting user personas
     @Scheduled(fixedDelay = 5000)
     public void generateCartOperations() {
         if (!loadEnabled) return;
         
         Flux.range(0, 3)
-            .flatMap(i -> {
-                String userId = getRandomUser();
-                String journeyId = generateJourneyId();
-                // 50% add and abandon, 50% view cart and abandon
-                if (ThreadLocalRandom.current().nextBoolean()) {
-                    return addToCartAndAbandon(userId, journeyId);
-                } else {
-                    return viewCartAndAbandon(userId, journeyId);
-                }
-            })
+            .flatMap(i -> simulateUserJourney())  // Uses persona system ✅
             .subscribe();
     }
     
     // Low frequency - every 10 seconds
-    // These are actual successful checkouts
+    // Generates journeys respecting user personas
     @Scheduled(fixedDelay = 10000)
     public void generateCheckouts() {
         if (!loadEnabled) return;
         
         Flux.range(0, 2)
-            .flatMap(i -> {
-                String userId = getRandomUser();
-                String journeyId = generateJourneyId();
-                return completeCheckoutJourney(userId, journeyId);
-            })
+            .flatMap(i -> simulateUserJourney())  // Uses persona system ✅
             .subscribe();
     }
     
