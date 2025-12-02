@@ -1,5 +1,6 @@
 package com.demo.gateway.controller;
 
+import com.demo.gateway.dto.CheckoutRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -184,9 +185,19 @@ public class GatewayController {
 
     // Order Service Endpoints
     @PostMapping("/orders/checkout")
-    public Mono<ResponseEntity<String>> checkout(@RequestBody String requestBody,
+    public Mono<ResponseEntity<String>> checkout(@RequestBody CheckoutRequest checkoutRequest,
                                                  @RequestHeader(value = "X-Session-ID", required = false) String sessionId,
                                                  @RequestHeader(value = "X-Journey-ID", required = false) String journeyId) {
+        
+        // APM DATA COLLECTOR: Log revenue data from method parameter
+        // checkoutRequest.getTotalAmount() and checkoutRequest.getItemCount() can be captured
+        logger.info("APM_REVENUE_PARAM: userId={}, totalAmount={}, itemCount={}, sessionId={}, journeyId={}", 
+                   checkoutRequest.getUserId(),
+                   checkoutRequest.getTotalAmount(),
+                   checkoutRequest.getItemCount(),
+                   sessionId,
+                   journeyId);
+        
         WebClient.RequestBodySpec request = webClientBuilder.build()
                 .post()
                 .uri(orderServiceUrl + "/api/orders/checkout")
@@ -200,7 +211,7 @@ public class GatewayController {
         }
         
         return request
-                .bodyValue(requestBody)
+                .bodyValue(checkoutRequest)
                 .retrieve()
                 .toEntity(String.class)
                 .map(response -> {
