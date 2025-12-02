@@ -158,12 +158,13 @@ public class CartController {
         int maxRetries = 3;
         
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            final int currentAttempt = attempt; // Make final for lambda
             try {
                 return cartRepository.findByUserId(userId)
                         .map(cart -> {
                             cart.getItems().clear();
                             cartRepository.save(cart);
-                            logger.debug("Cart cleared for userId={}, attempt={}", userId, attempt);
+                            logger.debug("Cart cleared for userId={}, attempt={}", userId, currentAttempt);
                             return ResponseEntity.ok().build();
                         })
                         .orElse(ResponseEntity.notFound().build());
