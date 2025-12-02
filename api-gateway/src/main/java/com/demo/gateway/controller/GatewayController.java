@@ -201,14 +201,14 @@ public class GatewayController {
                     ResponseEntity.BodyBuilder builder = ResponseEntity.status(response.getStatusCode());
                     
                     // Copy revenue tracking headers
+                    if (response.getHeaders().containsKey("OrderId")) {
+                        builder.header("OrderId", response.getHeaders().getFirst("OrderId"));
+                    }
                     if (response.getHeaders().containsKey("OrderValue")) {
                         builder.header("OrderValue", response.getHeaders().getFirst("OrderValue"));
                     }
                     if (response.getHeaders().containsKey("ItemCount")) {
                         builder.header("ItemCount", response.getHeaders().getFirst("ItemCount"));
-                    }
-                    if (response.getHeaders().containsKey("X-Order-ID")) {
-                        builder.header("X-Order-ID", response.getHeaders().getFirst("X-Order-ID"));
                     }
                     
                     return builder.body(response.getBody());

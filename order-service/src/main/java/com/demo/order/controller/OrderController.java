@@ -96,7 +96,7 @@ public class OrderController {
         
         // Add revenue tracking headers for APM
         return ResponseEntity.ok()
-                .header("X-Order-ID", savedOrder.getId().toString())
+                .header("OrderId", savedOrder.getId().toString())
                 .header("OrderValue", String.format("%.2f", total))
                 .header("ItemCount", String.valueOf(itemCount))
                 .body(savedOrder);
