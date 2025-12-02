@@ -255,5 +255,21 @@ public class GatewayController {
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("API Gateway is running");
     }
+    
+    // APM Revenue Metrics
+    @GetMapping("/metrics/revenue")
+    public Mono<ResponseEntity<String>> getRevenueMetrics() {
+        return webClientBuilder.build()
+                .get()
+                .uri(orderServiceUrl + "/api/orders/metrics/revenue")
+                .retrieve()
+                .toEntity(String.class)
+                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    return Mono.just(ResponseEntity
+                            .status(ex.getStatusCode())
+                            .body(ex.getResponseBodyAsString()));
+                });
+    }
 }
 

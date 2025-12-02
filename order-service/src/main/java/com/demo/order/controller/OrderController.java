@@ -94,7 +94,12 @@ public class OrderController {
         logger.info("FUNNEL_TRACKING: Checkout completed successfully - orderId={}, userId={}, sessionId={}, journeyId={}, totalValue=${}", 
                     savedOrder.getId(), userId, sessionId, journeyId, String.format("%.2f", total));
         
-        return ResponseEntity.ok(savedOrder);
+        // Add revenue tracking headers for APM
+        return ResponseEntity.ok()
+                .header("X-Order-ID", savedOrder.getId().toString())
+                .header("OrderValue", String.format("%.2f", total))
+                .header("ItemCount", String.valueOf(itemCount))
+                .body(savedOrder);
     }
 
     @GetMapping("/user/{userId}")
@@ -160,6 +165,31 @@ public class OrderController {
         response.put("slowModeEnabled", slowModeEnabled);
         response.put("delayMs", slowModeDelayMs);
         return ResponseEntity.ok(response);
+    }
+    
+    // APM Revenue Tracking: Metrics endpoint
+    @GetMapping("/metrics/revenue")
+    public ResponseEntity<Map<String, Object>> getRevenueMetrics() {
+        List<Order> allOrders = orderRepository.findAll();
+        
+        double totalRevenue = allOrders.stream()
+                .mapToDouble(Order::getTotalAmount)
+                .sum();
+        
+        double averageOrderValue = allOrders.isEmpty() ? 0 : totalRevenue / allOrders.size();
+        
+        long totalOrders = allOrders.size();
+        
+        Map<String, Object> metrics = new HashMap<>();
+        metrics.put("totalRevenue", String.format("%.2f", totalRevenue));
+        metrics.put("totalOrders", totalOrders);
+        metrics.put("averageOrderValue", String.format("%.2f", averageOrderValue));
+        metrics.put("timestamp", java.time.Instant.now().toString());
+        
+        logger.info("REVENUE_METRICS: totalRevenue=${}, totalOrders={}, avgOrderValue=${}", 
+                   String.format("%.2f", totalRevenue), totalOrders, String.format("%.2f", averageOrderValue));
+        
+        return ResponseEntity.ok(metrics);
     }
     
     // Helper method: Clear cart with retry logic for optimistic locking failures
