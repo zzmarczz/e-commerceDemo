@@ -1,5 +1,9 @@
 package com.demo.gateway.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -13,6 +17,9 @@ import reactor.core.publisher.Mono;
 @RestController
 @RequestMapping("/api")
 public class GatewayController {
+
+    private static final Logger logger = LoggerFactory.getLogger(GatewayController.class);
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private WebClient.Builder webClientBuilder;
@@ -211,7 +218,40 @@ public class GatewayController {
                         builder.header("X-Item-Count", response.getHeaders().getFirst("X-Item-Count"));
                     }
                     
-                    return builder.body(response.getBody());
+                    // APM DATA COLLECTOR: Parse response body to extract revenue data
+                    // These local variables can be captured by APM method instrumentation
+                    String responseBody = response.getBody();
+                    Long orderId = null;
+                    Double orderValue = null;
+                    Integer itemCount = null;
+                    String orderUserId = null;
+                    
+                    try {
+                        if (responseBody != null && !responseBody.isEmpty()) {
+                            JsonNode orderJson = objectMapper.readTree(responseBody);
+                            
+                            // Extract revenue fields from Order JSON
+                            orderId = orderJson.has("id") ? orderJson.get("id").asLong() : null;
+                            orderValue = orderJson.has("totalAmount") ? orderJson.get("totalAmount").asDouble() : null;
+                            orderUserId = orderJson.has("userId") ? orderJson.get("userId").asText() : null;
+                            
+                            // Count items from items array
+                            if (orderJson.has("items") && orderJson.get("items").isArray()) {
+                                itemCount = orderJson.get("items").size();
+                            }
+                            
+                            // Log for APM visibility (structured logging)
+                            logger.info("APM_REVENUE_GATEWAY: orderId={}, orderValue={}, itemCount={}, userId={}, sessionId={}, journeyId={}", 
+                                       orderId, orderValue, itemCount, orderUserId, sessionId, journeyId);
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to parse order response for APM revenue tracking: {}", e.getMessage());
+                    }
+                    
+                    // Note: orderId, orderValue, itemCount are LOCAL VARIABLES in this method
+                    // APM data collectors can capture them via method instrumentation
+                    
+                    return builder.body(responseBody);
                 })
                 .onErrorResume(WebClientResponseException.class, ex -> {
                     // Pass through client errors (4xx) and server errors (5xx) with original status and body

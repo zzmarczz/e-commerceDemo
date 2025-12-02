@@ -27,6 +27,18 @@ public class CorsConfig {
         // Allow all headers
         config.setAllowedHeaders(Arrays.asList("*"));
         
+        // Expose custom headers to browser/JavaScript (required for CORS)
+        config.setExposedHeaders(Arrays.asList(
+            "X-Session-ID",
+            "X-Journey-ID", 
+            "X-Order-Id",
+            "X-Order-Value",
+            "X-Item-Count",
+            "TotalRevenue",
+            "TotalOrders",
+            "AvgOrderValue"
+        ));
+        
         // Allow credentials
         config.setAllowCredentials(true);
         

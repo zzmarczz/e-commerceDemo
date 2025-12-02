@@ -94,6 +94,15 @@ public class OrderController {
         logger.info("FUNNEL_TRACKING: Checkout completed successfully - orderId={}, userId={}, sessionId={}, journeyId={}, totalValue=${}", 
                     savedOrder.getId(), userId, sessionId, journeyId, String.format("%.2f", total));
         
+        // APM Revenue Tracking: Log with method-level data for APM data collectors
+        // These values can be captured by APM tools via method instrumentation
+        logger.info("APM_REVENUE: orderId={}, orderValue={}, itemCount={}, userId={}, sessionId={}", 
+                    savedOrder.getId(), 
+                    String.format("%.2f", total), 
+                    itemCount, 
+                    userId, 
+                    sessionId);
+        
         // Add revenue tracking headers for APM (X- prefix for better APM compatibility)
         return ResponseEntity.ok()
                 .header("X-Order-Id", savedOrder.getId().toString())
