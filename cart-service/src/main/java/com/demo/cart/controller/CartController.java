@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/api/cart")
 public class CartController {
@@ -141,15 +143,23 @@ public class CartController {
     }
 
     @DeleteMapping("/{userId}/items/{itemId}")
-    public ResponseEntity<Cart> removeFromCart(@PathVariable String userId, 
+    public ResponseEntity<?> removeFromCart(@PathVariable String userId, 
                                                @PathVariable Long itemId) {
-        return cartRepository.findByUserId(userId)
-                .map(cart -> {
-                    cart.getItems().removeIf(item -> item.getId().equals(itemId));
-                    Cart savedCart = cartRepository.save(cart);
-                    return ResponseEntity.ok(savedCart);
-                })
-                .orElse(ResponseEntity.notFound().build());
+        Optional<Cart> cartOpt = cartRepository.findByUserId(userId);
+        if (!cartOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        Cart cart = cartOpt.get();
+        cart.getItems().removeIf(item -> item.getId().equals(itemId));
+        
+        try {
+            Cart savedCart = cartRepository.save(cart);
+            return ResponseEntity.ok(savedCart);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            logger.warn("Optimistic locking failure when removing from cart for userId: {}. Retrying operation.", userId);
+            return ResponseEntity.status(409).body("{\"error\":\"Concurrency Issue\",\"message\":\"Cart was updated by another process. Please try again.\"}");
+        }
     }
 
     @DeleteMapping("/{userId}")
@@ -158,16 +168,17 @@ public class CartController {
         int maxRetries = 3;
         
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            final int currentAttempt = attempt; // Make final for lambda
             try {
-                return cartRepository.findByUserId(userId)
-                        .map(cart -> {
-                            cart.getItems().clear();
-                            cartRepository.save(cart);
-                            logger.debug("Cart cleared for userId={}, attempt={}", userId, currentAttempt);
-                            return ResponseEntity.ok().build();
-                        })
-                        .orElse(ResponseEntity.notFound().build());
+                Optional<Cart> cartOpt = cartRepository.findByUserId(userId);
+                if (!cartOpt.isPresent()) {
+                    return ResponseEntity.notFound().build();
+                }
+                
+                Cart cart = cartOpt.get();
+                cart.getItems().clear();
+                cartRepository.save(cart);
+                logger.debug("Cart cleared for userId={}, attempt={}", userId, attempt);
+                return ResponseEntity.ok().build();
                         
             } catch (ObjectOptimisticLockingFailureException e) {
                 logger.warn("Optimistic locking failure clearing cart - userId={}, attempt={}/{}, retrying...", 
@@ -175,8 +186,8 @@ public class CartController {
                 
                 if (attempt >= maxRetries) {
                     logger.error("Failed to clear cart after {} retries - userId={}", maxRetries, userId);
-                    // Return success anyway - cart will be cleared eventually or user can clear manually
-                    return ResponseEntity.ok().build();
+                    return ResponseEntity.status(409)
+                        .body("{\"error\":\"Concurrency Issue\",\"message\":\"Cart was updated by another process. Please try again.\"}");
                 }
                 
                 // Small delay before retry
@@ -184,12 +195,14 @@ public class CartController {
                     Thread.sleep(50 * attempt); // Increasing backoff: 50ms, 100ms, 150ms
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    return ResponseEntity.ok().build();
+                    return ResponseEntity.status(500)
+                        .body("{\"error\":\"Interrupted\",\"message\":\"Operation was interrupted.\"}");
                 }
             }
         }
         
-        return ResponseEntity.ok().build();
+        return ResponseEntity.status(500)
+            .body("{\"error\":\"Unknown\",\"message\":\"Failed to clear cart after retries.\"}");
     }
 
     // APM Funnel Tracking: Cart View Event
