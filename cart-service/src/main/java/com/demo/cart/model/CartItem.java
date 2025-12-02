@@ -10,6 +10,9 @@ public class CartItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
+    @Version
+    private Long version;  // Optimistic locking
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id")
     @JsonIgnore

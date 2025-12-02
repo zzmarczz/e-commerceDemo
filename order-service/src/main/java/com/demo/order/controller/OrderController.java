@@ -86,22 +86,9 @@ public class OrderController {
         
         logger.info("FUNNEL_STAGE: Order created - orderId={}, userId={}", savedOrder.getId(), userId);
         
-        // Stage 4: Clear cart after successful checkout
+        // Stage 4: Clear cart after successful checkout (with retry for concurrency)
         logger.info("FUNNEL_STAGE: Clearing cart after successful checkout - userId={}", userId);
-        try {
-            webClientBuilder.build()
-                    .delete()
-                    .uri(cartServiceUrl + "/api/cart/" + userId)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-            
-            logger.info("FUNNEL_STAGE: Cart cleared successfully - userId={}", userId);
-        } catch (Exception e) {
-            logger.error("FUNNEL_ERROR: Failed to clear cart after checkout - userId={}, error={}", 
-                        userId, e.getMessage());
-            // Don't fail the checkout if cart clearing fails
-        }
+        clearCartWithRetry(userId);
         
         // Stage 5: Checkout completed
         logger.info("FUNNEL_TRACKING: Checkout completed successfully - orderId={}, userId={}, sessionId={}, journeyId={}, totalValue=${}", 
@@ -173,6 +160,44 @@ public class OrderController {
         response.put("slowModeEnabled", slowModeEnabled);
         response.put("delayMs", slowModeDelayMs);
         return ResponseEntity.ok(response);
+    }
+    
+    // Helper method: Clear cart with retry logic for optimistic locking failures
+    private void clearCartWithRetry(String userId) {
+        int maxRetries = 3;
+        int retryDelay = 100; // milliseconds
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                webClientBuilder.build()
+                        .delete()
+                        .uri(cartServiceUrl + "/api/cart/" + userId)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
+                
+                logger.info("FUNNEL_STAGE: Cart cleared successfully - userId={}, attempt={}", userId, attempt);
+                return; // Success, exit
+                
+            } catch (Exception e) {
+                String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                
+                if (attempt < maxRetries && (errorMsg.contains("OptimisticLocking") || errorMsg.contains("StaleObject"))) {
+                    logger.warn("FUNNEL_RETRY: Optimistic locking failure clearing cart - userId={}, attempt={}/{}, retrying in {}ms", 
+                               userId, attempt, maxRetries, retryDelay);
+                    try {
+                        Thread.sleep(retryDelay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                } else {
+                    logger.error("FUNNEL_ERROR: Failed to clear cart after checkout - userId={}, attempt={}/{}, error={}", 
+                                userId, attempt, maxRetries, errorMsg);
+                    // Don't fail the checkout if cart clearing fails
+                    return;
+                }
+            }
+        }
     }
 }
 

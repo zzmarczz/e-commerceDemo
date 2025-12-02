@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -52,62 +53,91 @@ public class CartController {
     @PostMapping("/{userId}/items")
     public ResponseEntity<?> addToCart(@PathVariable String userId, 
                                          @RequestBody AddToCartRequest request) {
-        // Find or create cart (handles race conditions)
-        Cart cart = getOrCreateCart(userId);
+        // Retry logic for optimistic locking conflicts
+        int maxRetries = 3;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Find or create cart (handles race conditions)
+                Cart cart = getOrCreateCart(userId);
 
-        // BUSINESS RULE: Check keyboard quantity limit (max 5 per customer)
-        if (request.getProductName().equalsIgnoreCase("Keyboard")) {
-            int currentKeyboardCount = 0;
-            
-            // Count existing keyboards in cart
-            for (CartItem item : cart.getItems()) {
-                if (item.getProductName().equalsIgnoreCase("Keyboard")) {
-                    currentKeyboardCount += item.getQuantity();
+                // BUSINESS RULE: Check keyboard quantity limit (max 5 per customer)
+                if (request.getProductName().equalsIgnoreCase("Keyboard")) {
+                    int currentKeyboardCount = 0;
+                    
+                    // Count existing keyboards in cart
+                    for (CartItem item : cart.getItems()) {
+                        if (item.getProductName().equalsIgnoreCase("Keyboard")) {
+                            currentKeyboardCount += item.getQuantity();
+                        }
+                    }
+                    
+                    // Calculate total after adding new quantity
+                    int totalKeyboards = currentKeyboardCount + request.getQuantity();
+                    
+                    if (totalKeyboards > 5) {
+                        // Throw error to showcase APM error detection
+                        return ResponseEntity.badRequest()
+                            .body("{\"error\":\"Business Rule Violation\",\"message\":\"Maximum 5 keyboards per customer. You currently have " 
+                                + currentKeyboardCount + " keyboard(s) in cart. Cannot add " + request.getQuantity() + " more.\"}");
+                    }
+                }
+
+                // BUG: Simulate a critical application error for APM demo (Monitor product)
+                // This demonstrates how APM detects NullPointerException and stack traces
+                if (request.getProductName().equalsIgnoreCase("Monitor")) {
+                    // Intentionally trigger NullPointerException
+                    String nullString = null;
+                    // This will throw: java.lang.NullPointerException: Cannot invoke "String.length()" because "nullString" is null
+                    int length = nullString.length();
+                }
+
+                // Check if item already exists
+                boolean itemExists = false;
+                for (CartItem item : cart.getItems()) {
+                    if (item.getProductId().equals(request.getProductId())) {
+                        item.setQuantity(item.getQuantity() + request.getQuantity());
+                        itemExists = true;
+                        break;
+                    }
+                }
+
+                if (!itemExists) {
+                    CartItem newItem = new CartItem(
+                        request.getProductId(),
+                        request.getProductName(),
+                        request.getPrice(),
+                        request.getQuantity()
+                    );
+                    cart.addItem(newItem);
+                }
+
+                Cart savedCart = cartRepository.save(cart);
+                return ResponseEntity.ok(savedCart);
+                
+            } catch (ObjectOptimisticLockingFailureException e) {
+                logger.warn("Optimistic locking failure adding to cart - userId={}, attempt={}/{}, retrying...", 
+                           userId, attempt, maxRetries);
+                
+                if (attempt >= maxRetries) {
+                    logger.error("Failed to add to cart after {} retries - userId={}", maxRetries, userId);
+                    return ResponseEntity.status(500)
+                        .body("{\"error\":\"Concurrency Error\",\"message\":\"Failed to add item due to concurrent modifications. Please try again.\"}");
+                }
+                
+                // Small delay before retry
+                try {
+                    Thread.sleep(50 * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return ResponseEntity.status(500)
+                        .body("{\"error\":\"Interrupted\",\"message\":\"Operation interrupted\"}");
                 }
             }
-            
-            // Calculate total after adding new quantity
-            int totalKeyboards = currentKeyboardCount + request.getQuantity();
-            
-            if (totalKeyboards > 5) {
-                // Throw error to showcase APM error detection
-                return ResponseEntity.badRequest()
-                    .body("{\"error\":\"Business Rule Violation\",\"message\":\"Maximum 5 keyboards per customer. You currently have " 
-                        + currentKeyboardCount + " keyboard(s) in cart. Cannot add " + request.getQuantity() + " more.\"}");
-            }
         }
-
-        // BUG: Simulate a critical application error for APM demo (Monitor product)
-        // This demonstrates how APM detects NullPointerException and stack traces
-        if (request.getProductName().equalsIgnoreCase("Monitor")) {
-            // Intentionally trigger NullPointerException
-            String nullString = null;
-            // This will throw: java.lang.NullPointerException: Cannot invoke "String.length()" because "nullString" is null
-            int length = nullString.length();
-        }
-
-        // Check if item already exists
-        boolean itemExists = false;
-        for (CartItem item : cart.getItems()) {
-            if (item.getProductId().equals(request.getProductId())) {
-                item.setQuantity(item.getQuantity() + request.getQuantity());
-                itemExists = true;
-                break;
-            }
-        }
-
-        if (!itemExists) {
-            CartItem newItem = new CartItem(
-                request.getProductId(),
-                request.getProductName(),
-                request.getPrice(),
-                request.getQuantity()
-            );
-            cart.addItem(newItem);
-        }
-
-        Cart savedCart = cartRepository.save(cart);
-        return ResponseEntity.ok(savedCart);
+        
+        return ResponseEntity.status(500)
+            .body("{\"error\":\"Unknown\",\"message\":\"Failed to add to cart\"}");
     }
 
     @DeleteMapping("/{userId}/items/{itemId}")
@@ -124,13 +154,41 @@ public class CartController {
 
     @DeleteMapping("/{userId}")
     public ResponseEntity<?> clearCart(@PathVariable String userId) {
-        return cartRepository.findByUserId(userId)
-                .map(cart -> {
-                    cart.getItems().clear();
-                    cartRepository.save(cart);
+        // Retry logic for optimistic locking conflicts
+        int maxRetries = 3;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return cartRepository.findByUserId(userId)
+                        .map(cart -> {
+                            cart.getItems().clear();
+                            cartRepository.save(cart);
+                            logger.debug("Cart cleared for userId={}, attempt={}", userId, attempt);
+                            return ResponseEntity.ok().build();
+                        })
+                        .orElse(ResponseEntity.notFound().build());
+                        
+            } catch (ObjectOptimisticLockingFailureException e) {
+                logger.warn("Optimistic locking failure clearing cart - userId={}, attempt={}/{}, retrying...", 
+                           userId, attempt, maxRetries);
+                
+                if (attempt >= maxRetries) {
+                    logger.error("Failed to clear cart after {} retries - userId={}", maxRetries, userId);
+                    // Return success anyway - cart will be cleared eventually or user can clear manually
                     return ResponseEntity.ok().build();
-                })
-                .orElse(ResponseEntity.notFound().build());
+                }
+                
+                // Small delay before retry
+                try {
+                    Thread.sleep(50 * attempt); // Increasing backoff: 50ms, 100ms, 150ms
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return ResponseEntity.ok().build();
+                }
+            }
+        }
+        
+        return ResponseEntity.ok().build();
     }
 
     // APM Funnel Tracking: Cart View Event

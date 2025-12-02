@@ -11,6 +11,9 @@ public class Cart {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
+    @Version
+    private Long version;  // Optimistic locking
+    
     @Column(unique = true, nullable = false)
     private String userId;
     
