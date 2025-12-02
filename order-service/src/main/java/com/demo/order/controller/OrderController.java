@@ -94,11 +94,11 @@ public class OrderController {
         logger.info("FUNNEL_TRACKING: Checkout completed successfully - orderId={}, userId={}, sessionId={}, journeyId={}, totalValue=${}", 
                     savedOrder.getId(), userId, sessionId, journeyId, String.format("%.2f", total));
         
-        // Add revenue tracking headers for APM
+        // Add revenue tracking headers for APM (X- prefix for better APM compatibility)
         return ResponseEntity.ok()
-                .header("OrderId", savedOrder.getId().toString())
-                .header("OrderValue", String.format("%.2f", total))
-                .header("ItemCount", String.valueOf(itemCount))
+                .header("X-Order-Id", savedOrder.getId().toString())
+                .header("X-Order-Value", String.format("%.2f", total))
+                .header("X-Item-Count", String.valueOf(itemCount))
                 .body(savedOrder);
     }
 

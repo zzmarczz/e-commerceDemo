@@ -200,15 +200,15 @@ public class GatewayController {
                     // Forward custom headers from Order Service to client for APM tracking
                     ResponseEntity.BodyBuilder builder = ResponseEntity.status(response.getStatusCode());
                     
-                    // Copy revenue tracking headers
-                    if (response.getHeaders().containsKey("OrderId")) {
-                        builder.header("OrderId", response.getHeaders().getFirst("OrderId"));
+                    // Copy revenue tracking headers (X- prefix for better APM auto-capture)
+                    if (response.getHeaders().containsKey("X-Order-Id")) {
+                        builder.header("X-Order-Id", response.getHeaders().getFirst("X-Order-Id"));
                     }
-                    if (response.getHeaders().containsKey("OrderValue")) {
-                        builder.header("OrderValue", response.getHeaders().getFirst("OrderValue"));
+                    if (response.getHeaders().containsKey("X-Order-Value")) {
+                        builder.header("X-Order-Value", response.getHeaders().getFirst("X-Order-Value"));
                     }
-                    if (response.getHeaders().containsKey("ItemCount")) {
-                        builder.header("ItemCount", response.getHeaders().getFirst("ItemCount"));
+                    if (response.getHeaders().containsKey("X-Item-Count")) {
+                        builder.header("X-Item-Count", response.getHeaders().getFirst("X-Item-Count"));
                     }
                     
                     return builder.body(response.getBody());
