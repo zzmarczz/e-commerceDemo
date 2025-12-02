@@ -196,7 +196,23 @@ public class GatewayController {
                 .bodyValue(requestBody)
                 .retrieve()
                 .toEntity(String.class)
-                .map(response -> ResponseEntity.status(response.getStatusCode()).body(response.getBody()))
+                .map(response -> {
+                    // Forward custom headers from Order Service to client for APM tracking
+                    ResponseEntity.BodyBuilder builder = ResponseEntity.status(response.getStatusCode());
+                    
+                    // Copy revenue tracking headers
+                    if (response.getHeaders().containsKey("OrderValue")) {
+                        builder.header("OrderValue", response.getHeaders().getFirst("OrderValue"));
+                    }
+                    if (response.getHeaders().containsKey("ItemCount")) {
+                        builder.header("ItemCount", response.getHeaders().getFirst("ItemCount"));
+                    }
+                    if (response.getHeaders().containsKey("X-Order-ID")) {
+                        builder.header("X-Order-ID", response.getHeaders().getFirst("X-Order-ID"));
+                    }
+                    
+                    return builder.body(response.getBody());
+                })
                 .onErrorResume(WebClientResponseException.class, ex -> {
                     // Pass through client errors (4xx) and server errors (5xx) with original status and body
                     return Mono.just(ResponseEntity
