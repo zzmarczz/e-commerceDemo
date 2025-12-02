@@ -15,10 +15,11 @@ public class CorsConfig {
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         
-        // Allow requests from frontend
-        config.setAllowedOrigins(Arrays.asList(
+        // Allow requests from frontend (any IP on port 3000)
+        config.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:3000",
-            "http://127.0.0.1:3000"
+            "http://127.0.0.1:3000",
+            "http://*:3000"  // Allow any IP on port 3000 (for EC2/cloud deployments)
         ));
         
         // Allow all HTTP methods

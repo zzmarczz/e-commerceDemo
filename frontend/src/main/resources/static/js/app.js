@@ -1,7 +1,10 @@
 // E-Commerce Demo - Frontend Application
 
 // Configuration
-const API_BASE_URL = 'http://localhost:8080/api';
+// Auto-detect API Gateway URL based on where frontend is loaded from
+const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8080/api'  // Local development
+    : `http://${window.location.hostname}:8080/api`;  // Production (EC2)
 let currentUserId = 'user123';
 let cartData = null;
 
